@@ -1,0 +1,113 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  email     String   @unique
+  password  String
+  role      Role
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  managedStudents Student[] @relation("ManagerStudents")
+  curatedStudents Student[] @relation("CuratorStudents")
+
+  @@map("user")
+}
+
+model Student {
+  id        String   @id @default(uuid())
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  phone     String   @unique
+  addedAt   DateTime @default(now()) @map("added_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  managerId String?
+  manager   User?   @relation("ManagerStudents", fields: [managerId], references: [id])
+
+  curatorId String?
+  curator   User?   @relation("CuratorStudents", fields: [curatorId], references: [id])
+
+  groupId String? @map("group_id")
+  group   Group?  @relation(fields: [groupId], references: [id])
+
+  courseId String? @map("course_id")
+  course   Course? @relation(fields: [courseId], references: [id])
+
+  payment Payment[]
+
+  coursePrice Int @map("course_price")
+
+  @@map("student")
+}
+
+model Group {
+  id             String         @id @default(uuid())
+  name           String         @unique
+  learningFormat LearningFormat @map("learning_format")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  students       Student[]
+
+  @@map("group")
+}
+
+model Course {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  icon      String
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  students  Student[]
+
+  @@map("course")
+}
+
+model Payment {
+  id         String        @id @default(uuid())
+  amount     Int
+  payment_at DateTime      @default(now()) @map("payment_at")
+  method     PaymentMethod
+  Student    Student?      @relation(fields: [studentId], references: [id])
+  studentId  String?
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  CURATOR
+}
+
+enum LearningFormat {
+  ONLINE
+  OFFLINE
+}
+
+enum PaymentMethod {
+  CASH
+  CARD_P2P
+  INTERNAL_INSTALLMENT_2
+  INTERNAL_INSTALLMENT_3
+  UZUM_NASIYA
+  UZUM_PAY
+  PAYME
+  ANORBANK
+  ALIF_NASIYA
+  CLICK
+  TRANSFER
+}
