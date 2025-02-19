@@ -82,9 +82,18 @@ model Payment {
   id         String        @id @default(uuid())
   amount     Int
   payment_at DateTime      @default(now()) @map("payment_at")
-  method     PaymentMethod
+  methodId   Int
+  method     PaymentMethod @relation(fields: [methodId], references: [id])
   Student    Student?      @relation(fields: [studentId], references: [id])
   studentId  String?
+}
+
+model PaymentMethod {
+  id      Int               @id @default(autoincrement())
+  code    PaymentMethodEnum
+  payment Payment[]
+
+  @@map("payment_method")
 }
 
 enum Role {
@@ -98,7 +107,7 @@ enum LearningFormat {
   OFFLINE
 }
 
-enum PaymentMethod {
+enum PaymentMethodEnum {
   CASH
   CARD_P2P
   INTERNAL_INSTALLMENT_2
