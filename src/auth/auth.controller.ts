@@ -28,7 +28,6 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   logout(@Req() req: Request & { user: JwtPayload }) {
-    console.log(req.user)
     if (!req.user) {
       throw new UnauthorizedException('Не авторизован')
     }
