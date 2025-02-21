@@ -1,59 +1,95 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { UsersService } from '../users/users.service'
 import * as bcrypt from 'bcrypt'
-import { User } from '@prisma/client'
 import { LoginDto } from 'src/auth/dto/login.dto'
+import { JwtPayload } from 'src/auth/types/jwt-payload.type'
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name)
+
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
   ) {}
 
   async login(dto: LoginDto) {
-    const user = await this.validateUser(dto.email, dto.password)
-    if (!user) {
+    const payload = await this.validateUser(dto.email, dto.password)
+    if (!payload) {
+      this.logger.warn(`Неудачная попытка входа для ${dto.email}`)
       throw new UnauthorizedException('Неправильный логин или пароль')
     }
+
+    const tokens = this.getTokens(payload)
+    const hashedRefreshToken = await bcrypt.hash(tokens.refresh_token, 10)
+    await this.usersService.updateUserToken(payload.id, hashedRefreshToken)
+
+    return tokens
+  }
+
+  async logout(userPayload: JwtPayload) {
+    const user = await this.usersService.getByEmail(userPayload.email)
+
+    if (!user?.refreshToken) {
+      throw new UnauthorizedException('Пользователь не авторизован')
+    }
+
+    await this.usersService.updateUserToken(userPayload.id, null)
+  }
+
+  async refreshToken(refreshToken: string) {
+    try {
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(refreshToken, {
+        secret: process.env.JWT_REFRESH_SECRET,
+      })
+
+      const user = await this.usersService.getByEmail(payload.email)
+      if (!user || !user.refreshToken) {
+        this.logger.warn(`Пользователь ${payload.email ?? 'неизвестный'} не найден или не имеет refreshToken`)
+        throw new UnauthorizedException('По данному токену не найден пользователь')
+      }
+
+      const isRefreshTokenValid = await bcrypt.compare(refreshToken, user.refreshToken)
+      if (!isRefreshTokenValid) {
+        this.logger.warn(`Ошибка валидации refreshToken для пользователя ${user.email}`)
+        throw new UnauthorizedException('Токены не совпадают')
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password: _, refreshToken: __, ...userPayload } = user
+      const tokens = this.getTokens(userPayload)
+
+      const hashedRefreshToken = await bcrypt.hash(tokens.refresh_token, 10)
+      await this.usersService.updateUserToken(user.id, hashedRefreshToken)
+
+      return tokens
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      this.logger.error(`Ошибка при обновлении refreshToken: ${error.message}`)
+      throw new UnauthorizedException('Неверный токен')
+    }
+  }
+
+  getTokens(payload: JwtPayload) {
     return {
-      access_token: this.jwtService.sign(user),
-      refresh_token: this.jwtService.sign(user, {
+      access_token: this.jwtService.sign(payload),
+      refresh_token: this.jwtService.sign(payload, {
         secret: process.env.JWT_REFRESH_SECRET,
         expiresIn: process.env.JWT_REFRESH_IN,
       }),
     }
   }
-  async refreshToken(refreshToken: string) {
-    try {
-      const payload = this.jwtService.verify(refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET,
-      })
 
-      const user = await this.usersService.getByEmail(payload.email)
-      if (!user) throw new UnauthorizedException('Пользователь не найден')
-
-      return {
-        access_token: this.jwtService.sign(user),
-        refresh_token: this.jwtService.sign(user, {
-          secret: process.env.JWT_REFRESH_SECRET,
-          expiresIn: process.env.JWT_REFRESH_IN,
-        }),
-      }
-    } catch (error) {
-      throw new UnauthorizedException('Невалидный рефреш токен')
-    }
-  }
-  async validateUser(email: string, password: string): Promise<Omit<User, 'password'>> {
+  async validateUser(email: string, password: string): Promise<JwtPayload> {
     const user = await this.usersService.getByEmail(email)
-
     if (!user || !(await bcrypt.compare(password, user.password))) {
+      this.logger.warn(`Ошибка аутентификации пользователя ${email}`)
       throw new UnauthorizedException('Неверные данные для входа')
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _, ...result } = user
-    return result
+    const { password: _, refreshToken, ...payload } = user
+    return payload
   }
 }
