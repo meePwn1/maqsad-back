@@ -14,14 +14,15 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  firstName String   @map("first_name")
-  lastName  String   @map("last_name")
-  email     String   @unique
-  password  String
-  role      Role
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  email        String   @unique
+  password     String
+  role         Role
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  refreshToken String?  @unique @map("refresh_token")
 
   managedStudents Student[] @relation("ManagerStudents")
   curatedStudents Student[] @relation("CuratorStudents")

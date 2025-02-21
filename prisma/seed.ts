@@ -12,6 +12,7 @@ async function main() {
       lastName: 'Kazakov',
       password,
       role: 'ADMIN',
+      refreshToken: null,
       createdAt: new Date(),
     },
   })
