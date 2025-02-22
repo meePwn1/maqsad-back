@@ -4,7 +4,7 @@ import { LoginDto } from 'src/auth/dto/login.dto'
 import { RefreshTokenDto } from 'src/auth/dto/refresh-token.dto'
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard'
 import { Public } from 'src/auth/decorators/public.decorator'
-import { JwtPayload } from 'src/auth/types/jwt-payload.type'
+import { RequestWithUser } from 'src/common/types/request-with-user.type'
 
 @Public()
 @Controller('auth')
@@ -27,7 +27,7 @@ export class AuthController {
   @HttpCode(204)
   @UseGuards(JwtAuthGuard)
   @Post('logout')
-  logout(@Req() req: Request & { user: JwtPayload }) {
+  logout(@Req() req: RequestWithUser) {
     if (!req.user) {
       throw new UnauthorizedException('Не авторизован')
     }
