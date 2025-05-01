@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client'
 
 export const seedPaymentMethods = async (prisma: PrismaClient) => {
   console.log('💳 Seeding payment methods...')
+  await prisma.payment.deleteMany()
   await prisma.paymentMethod.deleteMany()
 
   const paymentMethods = [
