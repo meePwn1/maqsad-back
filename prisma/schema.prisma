@@ -8,6 +8,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
+generator prismaClassGenerator {
+  provider = "prisma-class-generator"
+  output   = "./generated/classes"
+  dryRun   = false
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -20,6 +26,7 @@ model User {
   email        String   @unique
   password     String
   role         Role
+  avatar       String?
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
   refreshToken String?  @unique @map("refresh_token")
@@ -31,17 +38,26 @@ model User {
 }
 
 model Student {
-  id        String   @id @default(uuid())
-  firstName String   @map("first_name")
-  lastName  String   @map("last_name")
-  phone     String   @unique
-  addedAt   DateTime @default(now()) @map("added_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id          String    @id @default(uuid())
+  firstName   String    @map("first_name")
+  lastName    String    @map("last_name")
+  phone       String    @unique
+  addedAt     DateTime  @default(now()) @map("added_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  isDeleted   Boolean   @default(false) @map("is_deleted")
+  deletedAt   DateTime? @map("deleted_at")
+  coursePrice Int       @map("course_price")
 
-  managerId String?
+  deleteReasonId Int?          @map("delete_reason_id")
+  deleteReason   DeleteReason? @relation(fields: [deleteReasonId], references: [id])
+
+  isRefund Boolean @default(false) @map("is_refund")
+  refund   Refund? @relation("StudentRefund")
+
+  managerId String? @map("manager_id")
   manager   User?   @relation("ManagerStudents", fields: [managerId], references: [id])
 
-  curatorId String?
+  curatorId String? @map("curator_id")
   curator   User?   @relation("CuratorStudents", fields: [curatorId], references: [id])
 
   groupId String? @map("group_id")
@@ -50,17 +66,42 @@ model Student {
   courseId String? @map("course_id")
   course   Course? @relation(fields: [courseId], references: [id])
 
-  payment Payment[]
+  payment Payment[] @relation("StudentPayments")
 
-  coursePrice Int @map("course_price")
-
+  @@index([managerId])
+  @@index([curatorId])
+  @@index([groupId])
+  @@index([courseId])
   @@map("student")
+}
+
+model DeleteReason {
+  id      Int       @id @default(autoincrement())
+  nameUz  String    @map("name_uz")
+  nameRu  String    @map("name_ru")
+  Student Student[]
+
+  @@map("delete_reason")
+}
+
+model Refund {
+  id        String   @id @default(uuid())
+  amount    Int
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  studentId String  @unique @map("student_id")
+  student   Student @relation("StudentRefund", fields: [studentId], references: [id])
+
+  @@map("refund")
 }
 
 model Group {
   id             String         @id @default(uuid())
   name           String         @unique
   learningFormat LearningFormat @map("learning_format")
+  groupColor     String         @map("group_color")
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
   students       Student[]
@@ -80,19 +121,26 @@ model Course {
 }
 
 model Payment {
-  id         String        @id @default(uuid())
+  id         String   @id @default(uuid())
   amount     Int
-  payment_at DateTime      @default(now()) @map("payment_at")
-  methodId   Int
-  method     PaymentMethod @relation(fields: [methodId], references: [id])
-  Student    Student?      @relation(fields: [studentId], references: [id])
-  studentId  String?
+  payment_at DateTime @default(now()) @map("payment_at")
+
+  paymentMethodId Int           @map("payment_method_id")
+  paymentMethod   PaymentMethod @relation(fields: [paymentMethodId], references: [id])
+
+  student   Student @relation("StudentPayments", fields: [studentId], references: [id])
+  studentId String
+
+  @@index([studentId])
+  @@index([paymentMethodId])
+  @@map("payment")
 }
 
 model PaymentMethod {
-  id      Int               @id @default(autoincrement())
-  code    PaymentMethodEnum
-  payment Payment[]
+  id       Int       @id @default(autoincrement())
+  nameUz   String    @map("name_uz")
+  nameRu   String    @map("name_ru")
+  payments Payment[]
 
   @@map("payment_method")
 }
@@ -106,18 +154,4 @@ enum Role {
 enum LearningFormat {
   ONLINE
   OFFLINE
-}
-
-enum PaymentMethodEnum {
-  CASH
-  CARD_P2P
-  INTERNAL_INSTALLMENT_2
-  INTERNAL_INSTALLMENT_3
-  UZUM_NASIYA
-  UZUM_PAY
-  PAYME
-  ANORBANK
-  ALIF_NASIYA
-  CLICK
-  TRANSFER
 }
