@@ -1,23 +1,26 @@
 import { PrismaClient } from '@prisma/client'
-import * as bcrypt from 'bcrypt'
+import { seedDeleteReasons } from './seeds/delete-reasons.seed'
+import { seedPaymentMethods } from './seeds/payment-methods.seed'
+import { seedUsers } from './seeds/user.seed'
+import { courseSeed } from './seeds/course.seed'
+import { groupSeed } from './seeds/group.seed'
+import { studentSeed } from './seeds/student.seed'
+import { paymentSeed } from './seeds/payment.seed'
 
 const prisma = new PrismaClient()
 
 async function main() {
-  const password = bcrypt.hashSync('Sagesage1!', 10)
-  const admin = await prisma.user.create({
-    data: {
-      email: 'admin@example.com',
-      firstName: 'Djafar',
-      lastName: 'Kazakov',
-      password,
-      role: 'ADMIN',
-      refreshToken: null,
-      createdAt: new Date(),
-    },
-  })
+  console.log('🌱 Seeding database...')
 
-  console.log({ admin })
+  await seedUsers(prisma)
+  await seedPaymentMethods(prisma)
+  await seedDeleteReasons(prisma)
+  await courseSeed(prisma)
+  await groupSeed(prisma)
+  await studentSeed(prisma)
+  await paymentSeed(prisma)
+
+  console.log('✅ Seeding completed!')
 }
 
 // execute the main function
